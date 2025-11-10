@@ -228,19 +228,32 @@ Tous les services (PostgreSQL, Redis, etc.) seront démarrés via **Docker Compo
 docker network create local_network
 ```
 
-### 2. Compose PostgreSQL
+### 2. Structure des dossiers
 
-Créer `compose-postgres.yml` :
+Organiser chaque service dans son propre dossier avec un fichier `compose.yml` :
+
+```
+projet/
+├── postgres/
+│   └── compose.yml
+├── redis/
+│   └── compose.yml
+└── autre-service/
+    └── compose.yml
+```
+
+### 3. PostgreSQL
+
+Créer le dossier `postgres/compose.yml` :
 
 ```yaml
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: postgres-dev
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: catalogue_db
+      POSTGRES_DB: ecommerce_db
     ports:
       - "5432:5432"
     volumes:
@@ -256,55 +269,18 @@ networks:
     external: true
 ```
 
-### 3. Compose Redis
+### 4. Redis
 
-Créer `compose-redis.yml` :
+Créer le dossier `redis/compose.yml` :
 
 ```yaml
 services:
   redis:
     image: redis:7-alpine
-    container_name: redis-dev
     ports:
       - "6379:6379"
     networks:
       - local_network
-
-networks:
-  local_network:
-    external: true
-```
-
-### 4. Compose global (optionnel)
-
-Créer `compose.yml` pour démarrer tous les services :
-
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres-dev
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: catalogue_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - local_network
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis-dev
-    ports:
-      - "6379:6379"
-    networks:
-      - local_network
-
-volumes:
-  postgres_data:
 
 networks:
   local_network:
@@ -317,12 +293,19 @@ networks:
 # Créer le réseau (une seule fois)
 docker network create local_network
 
-# Démarrer tous les services
+# Démarrer PostgreSQL
+cd postgres
 docker compose up -d
+cd ..
 
-# OU démarrer séparément
-docker compose -f compose-postgres.yml up -d
-docker compose -f compose-redis.yml up -d
+# Démarrer Redis
+cd redis
+docker compose up -d
+cd ..
+
+# Option : Démarrer depuis un seul endroit avec -f (sans naviguer)
+docker compose -f postgres/compose.yml up -d
+docker compose -f redis/compose.yml up -d
 
 # Vérifier l'état
 docker compose ps
@@ -330,8 +313,12 @@ docker compose ps
 # Vérifier le réseau
 docker network inspect local_network
 
-# Arrêter les services
+# Arrêter un service (depuis son dossier)
+cd postgres
 docker compose down
+
+# Ou avec -f (optionnel)
+docker compose -f postgres/compose.yml down
 
 # Arrêter et supprimer les volumes
 docker compose down -v
@@ -392,6 +379,6 @@ docker compose ps
 
 - **SDKMAN** permet de basculer facilement entre différentes versions de Java : `sdk use java 21.0.5-amzn`
 - Tous les services (PostgreSQL, Redis) utilisent le réseau Docker externe `local_network`
-- Les fichiers Compose peuvent être nommés `compose.yml`, `compose-postgres.yml`, etc.
+- Chaque service a son propre dossier avec un fichier `compose.yml` (pas besoin de `-f`)
 - Sur Windows, utilisez **Git Bash** pour toutes les commandes terminal
 - H2 (base en mémoire) est également disponible pour les tests unitaires

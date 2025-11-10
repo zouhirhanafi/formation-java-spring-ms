@@ -12,7 +12,7 @@ Ce document présente l'ensemble des technologies, frameworks et outils utilisé
 
 | Technologie | Version | Usage | Module |
 |-------------|---------|-------|--------|
-| **Java** | 17+ | Langage principal | Tous |
+| **Java** | 21+ | Langage principal | Tous |
 | **Spring Boot** | 3.x | Framework application | Tous les services |
 | **Spring Web** | 3.x | API REST | Tous les services |
 | **Spring Data JPA** | 3.x | Accès données | Catalogue, Commandes, Utilisateurs |
@@ -37,7 +37,7 @@ Ce document présente l'ensemble des technologies, frameworks et outils utilisé
 
 | Technologie | Version | Usage | Module |
 |-------------|---------|-------|--------|
-| **PostgreSQL** | 15+ | Base de données production | Module 4 - Tous les services |
+| **PostgreSQL** | 16+ | Base de données production | Module 4 - Tous les services |
 | **H2 Database** | 2.x | Base en mémoire (dev/tests) | Module 2 - Tests |
 
 ### Migration & ORM

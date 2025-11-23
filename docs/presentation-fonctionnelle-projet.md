@@ -588,7 +588,7 @@ gantt
 
 ## 📚 Conclusion
 
-Cette plateforme e-commerce microservices constitue un **projet pédagogique complet** qui couvre :
+Cette plateforme e-commerce microservices constitue un **projet complet** qui couvre :
 
 - ✅ Les patterns d'architecture microservices
 - ✅ Les bonnes pratiques Spring Boot

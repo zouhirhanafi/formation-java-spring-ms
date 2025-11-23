@@ -1,6 +1,6 @@
 # Formation Pratique : Spring Boot & Microservices par le Projet (60h)
 
-## Concept Pédagogique
+## Concept
 
 Formation basée sur un **projet fil rouge** : développement progressif d'une plateforme e-commerce en microservices. Chaque module combine théorie courte et mise en pratique immédiate sur le projet.
 
@@ -21,15 +21,16 @@ Formation basée sur un **projet fil rouge** : développement progressif d'une p
 
 ## Module 1 : Fondamentaux Java Moderne & Setup Projet (5h)
 
-### Théorie (1h30)
+### Théorie (2h)
 
 - Rappels génériques et collections
 - Lambda et Streams API
 - Optional et programmation fonctionnelle
+- Introduction aux tests unitaires avec JUnit 6 et AssertJ
 
-### Projet (3h30)
+### Projet (4h)
 
-**Exercice pratique** : Initialisation du projet multi-modules Maven
+**Exercice pratique** : Initialisation des projets Maven
 
 - Créer la structure du projet avec Maven
 - Configurer Lombok
@@ -137,7 +138,7 @@ Formation basée sur un **projet fil rouge** : développement progressif d'une p
 
 ### Théorie (1h30)
 
-- JUnit 5 et Mockito
+- JUnit 6 et Mockito
 - Tests d'intégration avec @SpringBootTest
 - TestContainers pour PostgreSQL
 
@@ -268,7 +269,7 @@ Formation basée sur un **projet fil rouge** : développement progressif d'une p
 
 ---
 
-## Méthode Pédagogique
+## Méthode
 
 - **20% Théorie** : Concepts clés expliqués au début de chaque module
 - **80% Pratique** : Développement progressif sur le projet fil rouge

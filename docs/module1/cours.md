@@ -1098,7 +1098,7 @@ class ProductFilterTest {
         
         // Assert
         assertThat(electronics).hasSize(4);
-        assertThat(electronics).allMatch(p -> p.getCategory().equals("Electronics"));
+        assertThat(electronics).allMatch(p -> Objects.equals(p.getCategory(), "Electronics"));
     }
     
     @Test

@@ -9,15 +9,73 @@
 
 ## 🎯 Ce que vous allez apprendre
 
+- ✅ **Génériques** : Créer du code type-safe et réutilisable
 - ✅ **Lambda** : Écrire du code fonctionnel concis
 - ✅ **Streams API** : Traiter des collections de manière déclarative
 - ✅ **Optional** : Gérer l'absence de valeur sans `null`
 - ✅ **Lombok** : Réduire le code boilerplate
 - ✅ **Tests** : JUnit 6 + AssertJ
+- ✅ **Structure Maven** : Comprendre src/main et src/test
 
 ---
 
-## 1. Lambda & Références de Méthodes
+## 1. Les Génériques (Generics)
+
+### Pourquoi les génériques ?
+
+Les génériques permettent de créer des classes et méthodes **type-safe** qui fonctionnent avec différents types.
+
+**Sans génériques** (ancien code) :
+```java
+List list = new ArrayList();
+list.add("Hello");
+String str = (String) list.get(0); // Cast obligatoire, risque d'erreur
+```
+
+**Avec génériques** :
+```java
+List<String> list = new ArrayList<>();
+list.add("Hello");
+String str = list.get(0); // Pas de cast, sécurité garantie
+```
+
+### Classe générique
+
+```java
+public class Box<T> {
+    private T content;
+
+    public void set(T content) { this.content = content; }
+    public T get() { return content; }
+}
+
+// Utilisation
+Box<String> stringBox = new Box<>();
+Box<Integer> intBox = new Box<>();
+```
+
+### Types multiples
+
+```java
+public class Pair<K, V> {
+    private K key;
+    private V value;
+
+    public Pair(K key, V value) {
+        this.key = key;
+        this.value = value;
+    }
+}
+
+// Utilisation
+Pair<String, Integer> pair = new Pair<>("Age", 25);
+```
+
+**💡 À retenir** : Les génériques évitent les casts et garantissent la sécurité des types à la compilation.
+
+---
+
+## 2. Lambda & Références de Méthodes
 
 ### Pourquoi Lambda ?
 
@@ -107,7 +165,7 @@ list.stream().map(String::toUpperCase);
 
 ---
 
-## 2. Streams API
+## 3. Streams API
 
 ### Concept
 
@@ -255,7 +313,7 @@ Map<String, Long> stats = products.stream()
 
 ---
 
-## 3. Optional
+## 4. Optional
 
 ### Problème du `null`
 
@@ -349,7 +407,7 @@ public class UserService {
 
 ---
 
-## 4. Lombok
+## 5. Lombok
 
 ### Problème du Boilerplate
 
@@ -440,7 +498,7 @@ public class ProductDto {
 
 ---
 
-## 5. Tests avec JUnit 6 + AssertJ
+## 6. Tests avec JUnit 6 + AssertJ
 
 ### Structure d'un Test : Pattern AAA
 
@@ -595,7 +653,7 @@ class ProductFilterTest {
 
 ---
 
-## 6. Structure Standard Maven
+## 7. Structure Standard Maven
 
 ### Structure d'un Module Maven
 
@@ -636,6 +694,16 @@ src/test/java/
 ---
 
 ## 📚 Récapitulatif
+
+### Génériques
+```java
+// Avant
+List list = new ArrayList();
+String str = (String) list.get(0); // Cast
+// Après
+List<String> list = new ArrayList<>();
+String str = list.get(0); // Pas de cast
+```
 
 ### Lambda
 ```java

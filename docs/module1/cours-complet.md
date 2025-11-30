@@ -1238,17 +1238,496 @@ mvn test -Dtest=ProductFilterTest -X
 
 ---
 
+## 7. Structure Standard Maven
+
+### 7.1 Pourquoi une structure standard ?
+
+Maven impose une **convention over configuration** : tous les projets Maven partagent la même organisation de fichiers. Cela facilite la collaboration, l'automatisation et l'industrialisation du développement.
+
+### 7.2 Structure complète d'un module Maven
+
+```text
+mon-module/
+├── pom.xml                          # Configuration Maven
+├── src/
+│   ├── main/                        # Code de production
+│   │   ├── java/                    # Sources Java
+│   │   │   └── ma/ensaf/...         # Packages
+│   │   └── resources/               # Fichiers de configuration
+│   │       ├── application.yml
+│   │       ├── application.properties
+│   │       ├── static/              # Fichiers statiques (CSS, JS, images)
+│   │       └── templates/           # Templates (Thymeleaf, etc.)
+│   └── test/                        # Code de test ⚠️ SÉPARÉ !
+│       ├── java/                    # Tests Java
+│       │   └── ma/ensaf/...         # Même structure de packages
+│       └── resources/               # Ressources pour tests
+│           └── application-test.yml
+└── target/                          # Généré par Maven (build)
+    ├── classes/                     # .class de production
+    ├── test-classes/                # .class de test
+    ├── generated-sources/           # Sources générées (Lombok, etc.)
+    ├── surefire-reports/            # Rapports de tests
+    └── mon-module-1.0.0.jar         # JAR final
+```
+
+### 7.3 Pourquoi `src/test` et pas `src/main` pour les tests ?
+
+**Approche naïve** (avant Maven) :
+
+```java
+// ❌ MAUVAISE PRATIQUE
+src/main/java/
+├── Product.java
+├── ProductTest.java          // Test mélangé avec le code
+├── ProductService.java
+└── ProductServiceTest.java   // Test mélangé avec le code
+```
+
+**Avec Maven** (convention standard) :
+
+```java
+// ✅ BONNE PRATIQUE
+src/main/java/
+├── Product.java
+└── ProductService.java       // Seulement le code de production
+
+src/test/java/
+├── ProductTest.java          // Tests séparés
+└── ProductServiceTest.java   // Tests séparés
+```
+
+### 7.4 Les 4 avantages majeurs de `src/test` séparé
+
+#### 7.4.1 Packaging optimisé
+
+Le JAR final généré par `mvn package` ne contient **JAMAIS** les tests.
+
+```bash
+# Le JAR final ne contient PAS les tests
+mvn package
+# Génère: target/catalogue-service-1.0.0.jar (seulement src/main)
+```
+
+**Impact concret** :
+
+| Scénario | Avec tests dans src/main | Avec tests dans src/test |
+|----------|-------------------------|--------------------------|
+| Taille du JAR | 8 MB | 5 MB |
+| Temps de déploiement | Plus long | Plus rapide |
+| Sécurité | Code de test exposé ⚠️ | Tests non inclus ✅ |
+
+**Sans séparation** :
+- JAR de 5 MB → 8 MB (tests inclus inutilement)
+- Déploiement plus lourd sur les serveurs
+- Code de test exposé en production (risque de sécurité)
+- Dépendances de test dans le JAR (JUnit, Mockito, etc.)
+
+**Avec séparation** :
+- JAR contient uniquement le code de production
+- Déploiement optimisé
+- Aucun risque d'exposer des données de test sensibles
+
+#### 7.4.2 Dépendances séparées avec le scope `test`
+
+Maven utilise le concept de **scope** pour gérer les dépendances :
+
+```xml
+<!-- Dans pom.xml -->
+<dependencies>
+    <!-- Production : toujours incluses dans le JAR final -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+        <!-- Pas de scope = scope par défaut "compile" -->
+    </dependency>
+
+    <!-- Tests : scope "test" = NON incluses dans le JAR final -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+**Avantage** : JUnit, AssertJ, Mockito ne sont **jamais** dans le JAR de production.
+
+**Scopes Maven** :
+
+| Scope | Disponible pendant | Inclus dans le JAR ? | Usage typique |
+|-------|-------------------|---------------------|---------------|
+| `compile` (défaut) | Compilation, test, runtime | Oui | Dépendances de production |
+| `test` | Test uniquement | Non | JUnit, AssertJ, Mockito |
+| `provided` | Compilation, test | Non | Servlet API (fourni par Tomcat) |
+| `runtime` | Test, runtime | Oui | Drivers JDBC |
+
+#### 7.4.3 Classpath séparé
+
+Maven maintient deux classpaths distincts :
+
+```text
+Classpath de COMPILATION (src/main)
+  → Seulement les dépendances de production
+  → Utilisé par "mvn compile"
+  → Contient : Spring Boot, Lombok, Jackson, etc.
+  → Ne contient PAS : JUnit, AssertJ, Mockito
+
+Classpath de TEST (src/test)
+  → Dépendances de production + dépendances de test
+  → Utilisé par "mvn test"
+  → Contient : Spring Boot, Lombok + JUnit, AssertJ, Mockito
+```
+
+**Exemple concret d'erreur de compilation** :
+
+```java
+// src/main/java/Product.java
+package ma.ensaf.ecommerce.model;
+
+import org.junit.jupiter.api.Test;  // ❌ ERREUR de compilation
+// "Cannot resolve symbol 'Test'"
+// JUnit n'est PAS dans le classpath de production !
+
+public class Product {
+    @Test  // ❌ Annotation inconnue
+    public void validatePrice() {
+        // ...
+    }
+}
+```
+
+```java
+// src/test/java/ProductTest.java
+package ma.ensaf.ecommerce.model;
+
+import org.junit.jupiter.api.Test;  // ✅ OK
+// JUnit est dans le classpath de test
+
+public class ProductTest {
+    @Test  // ✅ Annotation reconnue
+    public void testProductCreation() {
+        // ...
+    }
+}
+```
+
+**Pourquoi c'est important ?**
+
+- Évite d'importer accidentellement des dépendances de test dans le code de production
+- Garantit que le code de production ne dépend PAS des outils de test
+- Protection au niveau de la compilation (erreur rapide)
+
+#### 7.4.4 Organisation claire du code
+
+**Scénario réel** : Projet avec 50 classes de production et 150 classes de test.
+
+**❌ Sans séparation** :
+
+```text
+src/main/java/ma/ensaf/ecommerce/
+├── model/
+│   ├── Product.java                 # 50 lignes
+│   ├── ProductTest.java             # 200 lignes
+│   ├── Order.java                   # 80 lignes
+│   ├── OrderTest.java               # 300 lignes
+│   ├── OrderItem.java               # 40 lignes
+│   └── OrderItemTest.java           # 150 lignes
+└── service/
+    ├── ProductService.java          # 100 lignes
+    ├── ProductServiceTest.java      # 400 lignes
+    ├── OrderService.java            # 150 lignes
+    └── OrderServiceTest.java        # 500 lignes
+
+→ Tout mélangé : 2020 lignes dans src/main !
+→ Difficile de distinguer code de prod vs tests
+→ Navigation complexe dans l'IDE
+```
+
+**✅ Avec séparation Maven** :
+
+```text
+src/main/java/ma/ensaf/ecommerce/
+├── model/
+│   ├── Product.java                 # 50 lignes
+│   ├── Order.java                   # 80 lignes
+│   └── OrderItem.java               # 40 lignes
+└── service/
+    ├── ProductService.java          # 100 lignes
+    └── OrderService.java            # 150 lignes
+
+→ Code de prod : 420 lignes, facile à lire
+→ Focus sur la logique métier
+
+src/test/java/ma/ensaf/ecommerce/
+├── model/
+│   ├── ProductTest.java             # 200 lignes
+│   ├── OrderTest.java               # 300 lignes
+│   └── OrderItemTest.java           # 150 lignes
+└── service/
+    ├── ProductServiceTest.java      # 400 lignes
+    └── OrderServiceTest.java        # 500 lignes
+
+→ Tests : 1550 lignes, séparés
+→ Facile de trouver le test correspondant à une classe
+```
+
+**Avantages organisationnels** :
+
+- Code de production plus facile à lire et à comprendre
+- Navigation rapide dans l'IDE (pas de pollution visuelle)
+- Revue de code simplifiée (se concentrer sur la prod)
+- Nouvelle personne dans l'équipe comprend vite la structure
+
+### 7.5 Cycle de build Maven
+
+Maven exécute les phases de build dans un ordre précis :
+
+```bash
+# Phase 1 : Compilation du code de production
+mvn compile
+# → Compile src/main/java → target/classes
+# → Utilise le classpath de production (sans JUnit, etc.)
+
+# Phase 2 : Compilation des tests
+mvn test-compile
+# → Compile src/test/java → target/test-classes
+# → Utilise le classpath de test (prod + test)
+
+# Phase 3 : Exécution des tests
+mvn test
+# → Exécute les tests de src/test/java
+# → Génère des rapports dans target/surefire-reports
+
+# Phase 4 : Packaging (JAR/WAR)
+mvn package
+# → Crée le JAR avec SEULEMENT target/classes (pas test-classes)
+# → Résultat : target/mon-module-1.0.0.jar
+
+# Phase 5 : Installation locale
+mvn install
+# → Copie le JAR dans ~/.m2/repository
+# → Rend le JAR disponible pour d'autres projets Maven locaux
+```
+
+**Pipeline complet** :
+
+```bash
+mvn clean install
+```
+
+Exécute dans l'ordre :
+1. `clean` → Supprime target/
+2. `compile` → Compile src/main
+3. `test-compile` → Compile src/test
+4. `test` → Exécute les tests
+5. `package` → Crée le JAR
+6. `install` → Copie dans ~/.m2
+
+### 7.6 Contenu du JAR final
+
+Après `mvn package`, voici le contenu du JAR généré :
+
+```bash
+# Contenu du JAR généré par "mvn package"
+catalogue-service-1.0.0.jar
+├── ma/ensaf/ecommerce/
+│   ├── model/
+│   │   ├── Product.class              # ✅ Code de production
+│   │   ├── Order.class                # ✅ Code de production
+│   │   └── OrderItem.class            # ✅ Code de production
+│   └── service/
+│       ├── ProductService.class       # ✅ Code de production
+│       └── OrderService.class         # ✅ Code de production
+├── application.yml                    # ✅ Ressources de production
+└── META-INF/
+    ├── MANIFEST.MF
+    └── maven/
+        └── ma.ensaf.ecommerce/
+            └── catalogue-service/
+                └── pom.xml
+
+# ⚠️ AUCUN fichier de test dans le JAR !
+# ProductTest.class n'est PAS inclus
+# ProductServiceTest.class n'est PAS inclus
+# application-test.yml n'est PAS inclus
+```
+
+**Vérifier le contenu du JAR** :
+
+```bash
+# Lister le contenu
+jar tf target/catalogue-service-1.0.0.jar
+
+# Extraire le JAR
+jar xf target/catalogue-service-1.0.0.jar
+```
+
+### 7.7 Miroir de structure de packages
+
+**Convention Maven** : Toujours reproduire la même structure de packages dans `src/test` que dans `src/main`.
+
+```text
+src/main/java/ma/ensaf/ecommerce/
+├── model/
+│   ├── Product.java
+│   ├── Order.java
+│   └── OrderItem.java
+├── repository/
+│   ├── ProductRepository.java
+│   └── OrderRepository.java
+├── service/
+│   ├── ProductService.java
+│   └── OrderService.java
+└── util/
+    └── ProductFilter.java
+
+src/test/java/ma/ensaf/ecommerce/
+├── model/
+│   ├── ProductTest.java              # Même package !
+│   ├── OrderTest.java
+│   └── OrderItemTest.java
+├── repository/
+│   ├── ProductRepositoryTest.java    # Même package !
+│   └── OrderRepositoryTest.java
+├── service/
+│   ├── ProductServiceTest.java       # Même package !
+│   └── OrderServiceTest.java
+└── util/
+    └── ProductFilterTest.java        # Même package !
+```
+
+**Pourquoi reproduire la structure ?**
+
+1. **Accès aux membres `package-private`** :
+   ```java
+   // src/main/java/ma/ensaf/ecommerce/model/Product.java
+   package ma.ensaf.ecommerce.model;
+
+   public class Product {
+       // Méthode package-private (pas de modificateur)
+       void internalCalculation() {
+           // ...
+       }
+   }
+
+   // src/test/java/ma/ensaf/ecommerce/model/ProductTest.java
+   package ma.ensaf.ecommerce.model;  // ⚠️ Même package !
+
+   class ProductTest {
+       @Test
+       void testInternalCalculation() {
+           Product p = new Product();
+           p.internalCalculation();  // ✅ Accessible car même package
+       }
+   }
+   ```
+
+2. **Navigation facile dans l'IDE** :
+   - IntelliJ/Eclipse : `Ctrl+Shift+T` (Windows) ou `Cmd+Shift+T` (Mac) pour basculer entre classe et test
+   - Structure identique facilite la navigation
+
+3. **Convention Java universelle** :
+   - Tous les projets Java/Maven suivent cette convention
+   - Facilite l'onboarding de nouveaux développeurs
+
+### 7.8 Ressources de test séparées
+
+Les fichiers de configuration de test vont dans `src/test/resources` :
+
+```text
+src/main/resources/
+├── application.yml              # Config de production
+├── application-prod.yml
+└── data.sql
+
+src/test/resources/
+├── application-test.yml         # Config spécifique aux tests
+├── test-data.sql                # Données de test
+└── mock-response.json           # Mocks pour les tests
+```
+
+**Exemple `application-test.yml`** :
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb    # Base en mémoire pour tests
+  jpa:
+    show-sql: true             # Afficher les requêtes SQL pendant les tests
+```
+
+### 7.9 Commandes Maven utiles
+
+```bash
+# Compiler uniquement le code de production
+mvn compile
+
+# Compiler le code de production + les tests
+mvn test-compile
+
+# Exécuter tous les tests
+mvn test
+
+# Exécuter un test spécifique
+mvn test -Dtest=ProductTest
+
+# Exécuter une méthode de test spécifique
+mvn test -Dtest=ProductTest#testProductCreation
+
+# Exécuter les tests avec pattern
+mvn test -Dtest=*Service*
+
+# Skip tests (utile pour build rapide)
+mvn package -DskipTests
+
+# Afficher l'arbre des dépendances
+mvn dependency:tree
+
+# Nettoyer et rebuilder
+mvn clean install
+```
+
+### 7.10 Résumé : Convention over Configuration
+
+Maven impose des conventions pour simplifier la vie des développeurs :
+
+| Aspect | Convention Maven | Avantage |
+|--------|-----------------|----------|
+| Structure | `src/main` et `src/test` séparés | Organisation claire |
+| Compilation | Classpath séparés | Sécurité du code de prod |
+| Packaging | Tests exclus du JAR | Déploiement optimisé |
+| Dépendances | Scope `test` pour les tests | JAR sans dépendances de test |
+| Packages | Miroir entre main et test | Navigation facile |
+
+**Principe** : En respectant ces conventions, vous bénéficiez automatiquement de tous ces avantages sans configuration supplémentaire.
+
+---
+
 ## Récapitulatif
 
 Dans ce module, vous avez appris :
 
-✅ Les **génériques** pour créer du code type-safe et réutilisable  
-✅ Les **lambda** et les **références de méthodes** pour un code plus concis  
-✅ La **Streams API** pour traiter les collections de manière fonctionnelle  
-✅ **Optional** pour gérer l'absence de valeur proprement  
-✅ **Lombok** pour réduire le code boilerplate  
-✅ **JUnit 6** pour écrire des tests unitaires  
-✅ **AssertJ** pour des assertions fluides et expressives  
+✅ Les **génériques** pour créer du code type-safe et réutilisable
+✅ Les **lambda** et les **références de méthodes** pour un code plus concis
+✅ La **Streams API** pour traiter les collections de manière fonctionnelle
+✅ **Optional** pour gérer l'absence de valeur proprement
+✅ **Lombok** pour réduire le code boilerplate
+✅ **JUnit 6** pour écrire des tests unitaires
+✅ **AssertJ** pour des assertions fluides et expressives
+✅ La **structure Maven** et pourquoi séparer `src/main` de `src/test`
 
 Ces concepts sont **essentiels** pour le développement moderne en Java et seront utilisés tout au long de la formation.
 

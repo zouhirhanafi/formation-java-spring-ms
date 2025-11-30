@@ -152,6 +152,10 @@ mkdir -p common/src/main/java/ma/ensaf/ecommerce/common/{model,util,exception}
 mkdir -p common/src/test/java/ma/ensaf/ecommerce/common/{model,util}
 ```
 
+> **⚠️ IMPORTANT** : Les tests doivent **toujours** être dans `src/test/java`, jamais dans `src/main/java` !
+>
+> Pourquoi ? Le JAR final ne contiendra PAS les tests (déploiement plus léger). Voir section 6 du cours pour détails.
+
 #### 3. Créer les modules services
 
 Créez chaque module avec :

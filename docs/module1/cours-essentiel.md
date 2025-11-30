@@ -595,6 +595,46 @@ class ProductFilterTest {
 
 ---
 
+## 6. Structure Standard Maven
+
+### Structure d'un Module Maven
+
+```text
+mon-module/
+├── pom.xml                          # Configuration Maven
+├── src/
+│   ├── main/                        # Code de production
+│   │   ├── java/                    # Sources Java
+│   │   └── resources/               # Fichiers de configuration
+│   └── test/                        # Code de test ⚠️ SÉPARÉ
+│       ├── java/                    # Tests (même structure de packages)
+│       └── resources/               # Ressources de test
+└── target/                          # Généré par Maven
+```
+
+### Pourquoi `src/test` est séparé ?
+
+**Maven sépare le code de production du code de test** pour 3 raisons principales :
+
+1. **JAR final plus léger** : Les tests ne sont PAS inclus dans le déploiement
+2. **Dépendances isolées** : JUnit/AssertJ (scope `test`) ne vont jamais en production
+3. **Organisation claire** : Code facile à naviguer
+
+**Exemple** :
+
+```java
+// ✅ Structure Maven standard
+src/main/java/
+  └── Product.java              // Code de production
+
+src/test/java/
+  └── ProductTest.java          // Tests séparés
+```
+
+**💡 Règle importante** : Toujours reproduire la même structure de packages dans `src/test` que dans `src/main`.
+
+---
+
 ## 📚 Récapitulatif
 
 ### Lambda

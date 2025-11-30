@@ -254,91 +254,159 @@ mvn test -Dtest=ProductTest
 
 ---
 
-## 🔍 Exercice 3 : ProductFilter avec Streams API (1h30)
+## 🔍 Exercice 3 : ProductFilter avec Streams API (2h)
 
 ### Objectif
 
 Créer une classe utilitaire pour filtrer des produits avec la Streams API.
 
-### Instructions
+Cet exercice est **découpé en 2 parties** pour une progression graduelle :
+- **Partie A (1h15)** : Méthodes de base (filter, map, sorted, min, max)
+- **Partie B (45min)** : Méthodes avancées (groupBy, reduce, collectors complexes)
+
+---
+
+### 🎯 Partie A : Méthodes de Base (1h15)
 
 Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/ProductFilter.java`.
 
-Cette classe doit contenir les méthodes suivantes (**sans constructeur, méthodes d'instance**) :
+#### Méthodes à implémenter - Partie A
 
-#### Méthodes à implémenter
+| Méthode | Signature | Description | Concepts Streams |
+|---------|-----------|-------------|------------------|
+| `filterByCategory` | `List<Product> filterByCategory(List<Product> products, String category)` | Filtre par catégorie exacte | `filter()` |
+| `filterByPriceRange` | `List<Product> filterByPriceRange(List<Product> products, double min, double max)` | Produits entre min et max | `filter()` |
+| `filterAvailableProducts` | `List<Product> filterAvailableProducts(List<Product> products)` | Produits disponibles (isAvailableForSale) | `filter()` |
+| `searchByNameContaining` | `List<Product> searchByNameContaining(List<Product> products, String term)` | Recherche insensible à la casse | `filter()` + `toLowerCase()` |
+| `findCheapest` | `Optional<Product> findCheapest(List<Product> products)` | Produit le moins cher | `min()` |
+| `calculateAveragePrice` | `double calculateAveragePrice(List<Product> products)` | Prix moyen (0 si liste vide) | `mapToDouble()` + `average()` |
+| `getProductNamesUpperCase` | `List<String> getProductNamesUpperCase(List<Product> products)` | Noms en majuscules | `map()` |
+| `sortByPrice` | `List<Product> sortByPrice(List<Product> products)` | Tri croissant par prix | `sorted()` |
 
-| Méthode | Signature | Description |
-|---------|-----------|-------------|
-| `filterByCategory` | `List<Product> filterByCategory(List<Product> products, String category)` | Filtre par catégorie exacte |
-| `filterByPriceRange` | `List<Product> filterByPriceRange(List<Product> products, double min, double max)` | Produits entre min et max |
-| `filterAvailableProducts` | `List<Product> filterAvailableProducts(List<Product> products)` | Produits disponibles (isAvailableForSale) |
-| `searchByNameContaining` | `List<Product> searchByNameContaining(List<Product> products, String term)` | Recherche insensible à la casse |
-| `findCheapest` | `Optional<Product> findCheapest(List<Product> products)` | Produit le moins cher |
-| `findMostExpensive` | `Optional<Product> findMostExpensive(List<Product> products)` | Produit le plus cher |
-| `calculateAveragePrice` | `double calculateAveragePrice(List<Product> products)` | Prix moyen (0 si liste vide) |
-| `calculateTotalValue` | `double calculateTotalValue(List<Product> products)` | Somme de (prix * stock) |
-| `groupByCategory` | `Map<String, List<Product>> groupByCategory(List<Product> products)` | Groupe par catégorie |
-| `countByCategory` | `Map<String, Long> countByCategory(List<Product> products)` | Compte par catégorie |
-| `getProductNamesUpperCase` | `List<String> getProductNamesUpperCase(List<Product> products)` | Noms en majuscules |
-| `sortByPrice` | `List<Product> sortByPrice(List<Product> products)` | Tri croissant par prix |
-| `sortByName` | `List<String> sortByName(List<Product> products)` | Tri alphabétique |
-| `getTopNCheapest` | `List<Product> getTopNCheapest(List<Product> products, int n)` | N premiers moins chers |
-| `areAllProductsAvailable` | `boolean areAllProductsAvailable(List<Product> products)` | Tous disponibles ? |
-| `isAnyProductAvailable` | `boolean isAnyProductAvailable(List<Product> products)` | Au moins 1 disponible ? |
-| `countOutOfStockProducts` | `long countOutOfStockProducts(List<Product> products)` | Nombre en rupture |
+#### 💡 Conseils - Partie A
 
-### 💡 Conseils
-
-- Toutes les méthodes doivent gérer le cas `products == null` → retourner collection vide ou valeur par défaut
-- Utilisez les méthodes de Stream : `filter()`, `map()`, `collect()`, `sorted()`, `min()`, `max()`, `count()`, etc.
+- Toutes les méthodes doivent gérer `products == null` → retourner collection vide ou valeur par défaut
 - Pour `Optional`, utilisez `orElse()` ou `orElseGet()`
-- Pour grouper : `Collectors.groupingBy()`
-- Pour compter : `Collectors.counting()`
+- Utilisez `Comparator.comparing()` pour le tri
+- N'oubliez pas `.collect(Collectors.toList())` pour collecter les résultats
 
-### Tests à écrire
+#### Tests à écrire - Partie A
 
 Créez `common/src/test/java/ma/ensaf/ecommerce/common/util/ProductFilterTest.java`.
 
-Écrivez au minimum ces tests :
+**12 tests minimum** :
 
-1. Tester `filterByCategory()` avec catégorie "Electronics"
-2. Tester `filterByCategory()` avec null → liste vide
-3. Tester `filterByPriceRange()` entre 50 et 150
-4. Tester `filterAvailableProducts()`
-5. Tester `searchByNameContaining()` avec "pro" (insensible casse)
-6. Tester `findCheapest()` → produit le moins cher
-7. Tester `findCheapest()` avec liste vide → Optional.empty()
-8. Tester `findMostExpensive()`
-9. Tester `calculateAveragePrice()`
-10. Tester `calculateAveragePrice()` liste vide → 0.0
-11. Tester `calculateTotalValue()`
-12. Tester `groupByCategory()` → 3 catégories
-13. Tester `countByCategory()`
-14. Tester `getProductNamesUpperCase()`
-15. Tester `sortByPrice()` → ordre croissant
-16. Tester `sortByName()` → ordre alphabétique
-17. Tester `getTopNCheapest(3)` → 3 premiers
-18. Tester `areAllProductsAvailable()` → false (données mixtes)
-19. Tester `isAnyProductAvailable()` → true
-20. Tester `countOutOfStockProducts()`
+1. `filterByCategory()` avec catégorie "Electronics" → 3 produits
+2. `filterByCategory()` avec null → liste vide
+3. `filterByPriceRange()` entre 50 et 150
+4. `filterAvailableProducts()` → seulement les disponibles
+5. `searchByNameContaining()` avec "pro" → insensible à la casse
+6. `searchByNameContaining()` avec null → liste vide
+7. `findCheapest()` → produit le moins cher
+8. `findCheapest()` avec liste vide → Optional.empty()
+9. `calculateAveragePrice()` → prix moyen > 0
+10. `calculateAveragePrice()` liste vide → 0.0
+11. `getProductNamesUpperCase()` → tous en majuscules
+12. `sortByPrice()` → ordre croissant vérifié
 
-### Données de test
+#### Données de test
 
-Créez une méthode `createSampleProducts()` retournant :
+Ajoutez une méthode `createSampleProducts()` dans votre classe de test :
 
-- 3 produits "Electronics" (Laptop 1299€, iPhone 1199€, Samsung 999€)
-- 2 produits "Clothing" (T-Shirt 29€ available, Jean 89€ not available)
-- 1 produit "Furniture" (Chaise 299€)
+```java
+private List<Product> createSampleProducts() {
+    return Arrays.asList(
+        Product.builder()
+            .id(1L).name("Laptop Dell XPS 13").price(1299.99)
+            .category("Electronics").available(true).stock(15).build(),
+        Product.builder()
+            .id(2L).name("iPhone 15 Pro").price(1199.99)
+            .category("Electronics").available(true).stock(25).build(),
+        Product.builder()
+            .id(3L).name("Samsung Galaxy S24").price(999.99)
+            .category("Electronics").available(true).stock(30).build(),
+        Product.builder()
+            .id(4L).name("T-Shirt Nike").price(29.99)
+            .category("Clothing").available(true).stock(100).build(),
+        Product.builder()
+            .id(5L).name("Jean Levi's 501").price(89.99)
+            .category("Clothing").available(false).stock(0).build(),
+        Product.builder()
+            .id(6L).name("Chaise Bureau Ergonomique").price(299.99)
+            .category("Furniture").available(true).stock(5).build()
+    );
+}
+```
 
-### Validation
+#### ✅ Validation Partie A
 
 ```bash
 cd common
 mvn test -Dtest=ProductFilterTest
 ```
 
-✅ **Attendu** : `Tests run: 20+, Failures: 0`
+**Attendu** : `Tests run: 12, Failures: 0`
+
+⚠️ **CHECKPOINT** : Validez cette partie avant de passer à la Partie B !
+
+---
+
+### 🚀 Partie B : Méthodes Avancées (45min)
+
+**Prérequis** : Avoir terminé la Partie A avec succès
+
+#### Méthodes à implémenter - Partie B
+
+| Méthode | Signature | Description | Concepts Streams |
+|---------|-----------|-------------|------------------|
+| `findMostExpensive` | `Optional<Product> findMostExpensive(List<Product> products)` | Produit le plus cher | `max()` |
+| `calculateTotalValue` | `double calculateTotalValue(List<Product> products)` | Somme de (prix * stock) | `mapToDouble()` + `sum()` |
+| `groupByCategory` | `Map<String, List<Product>> groupByCategory(List<Product> products)` | Groupe par catégorie | `groupingBy()` |
+| `countByCategory` | `Map<String, Long> countByCategory(List<Product> products)` | Compte par catégorie | `groupingBy()` + `counting()` |
+| `getTopNCheapest` | `List<Product> getTopNCheapest(List<Product> products, int n)` | N premiers moins chers | `sorted()` + `limit()` |
+| `countOutOfStockProducts` | `long countOutOfStockProducts(List<Product> products)` | Nombre en rupture | `filter()` + `count()` |
+
+#### 💡 Conseils - Partie B
+
+- Pour `groupByCategory()` : `Collectors.groupingBy(Product::getCategory)`
+- Pour `countByCategory()` : `Collectors.groupingBy(Product::getCategory, Collectors.counting())`
+- Pour `getTopNCheapest()` : combiner `sorted()` puis `limit(n)`
+- `calculateTotalValue()` : mapper vers prix * stock, puis summer
+
+#### Tests à écrire - Partie B
+
+Ajoutez **8 tests supplémentaires** à `ProductFilterTest` :
+
+13. `findMostExpensive()` → produit le plus cher
+14. `calculateTotalValue()` → valeur totale du stock
+15. `groupByCategory()` → Map avec 3 catégories
+16. `groupByCategory()` → Taille de chaque groupe correcte
+17. `countByCategory()` → Map avec comptages corrects
+18. `getTopNCheapest(3)` → 3 premiers produits
+19. `getTopNCheapest(3)` → ordre croissant vérifié
+20. `countOutOfStockProducts()` → compte correct
+
+#### ✅ Validation Partie B
+
+```bash
+cd common
+mvn test -Dtest=ProductFilterTest
+```
+
+**Attendu** : `Tests run: 20, Failures: 0`
+
+---
+
+### 📊 Validation Finale Ex3
+
+Après avoir terminé les deux parties :
+
+```bash
+cd common
+mvn test -Dtest=ProductFilterTest
+```
+
+✅ **Attendu** : `Tests run: 20, Failures: 0`
 
 ---
 

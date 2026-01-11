@@ -678,6 +678,87 @@ catalogue:
   enable-cache: false
 ```
 
+#### Configuration du Context Path (optionnel)
+
+**Context path** = Préfixe URL pour toutes les routes de l'application.
+
+**Configuration** :
+
+```yaml
+server:
+  servlet:
+    context-path: /catalogue  # Optionnel
+```
+
+**Impact sur les URLs** :
+
+| Configuration | URLs finales | Cas d'usage |
+|---------------|--------------|-------------|
+| **Sans context-path** (par défaut) | `http://localhost:8081/api/v1/products` | Application unique ou API Gateway |
+| **Avec `/catalogue`** | `http://localhost:8081/catalogue/api/v1/products` | Plusieurs services sur même port (dev local) |
+| **Avec `/api`** | `http://localhost:8081/api/v1/products` | Convention courante |
+
+**Exemples concrets** :
+
+```yaml
+# Option 1 : Pas de context-path (recommandé en production)
+server:
+  port: 8081
+# URLs : http://localhost:8081/api/v1/products
+#        http://localhost:8081/h2-console
+
+# Option 2 : Avec context-path (pratique en dev multi-services)
+server:
+  port: 8081
+  servlet:
+    context-path: /catalogue
+# URLs : http://localhost:8081/catalogue/api/v1/products
+#        http://localhost:8081/catalogue/h2-console
+```
+
+**⚠️ Points d'attention** :
+
+1. **Controllers** : Le context-path est automatiquement ajouté
+
+```java
+@RestController
+@RequestMapping("/api/v1/products")  // Pas besoin de préfixer avec /catalogue
+public class ProductController { }
+
+// URLs générées :
+// Sans context-path : /api/v1/products
+// Avec /catalogue : /catalogue/api/v1/products
+```
+
+2. **Tests** : MockMvc utilise automatiquement le context-path
+
+```java
+@Test
+void test() {
+    // Si context-path = /catalogue
+    mockMvc.perform(get("/api/v1/products"))  // Fonctionne !
+        .andExpect(status().isOk());
+}
+```
+
+3. **Client HTTP** : Pensez à inclure le context-path
+
+```bash
+# Sans context-path
+curl http://localhost:8081/api/v1/products
+
+# Avec context-path
+curl http://localhost:8081/catalogue/api/v1/products
+```
+
+**💡 Bonne pratique** :
+
+- **Dev local** : Utilisez context-path si plusieurs services tournent sur ports différents
+- **Production** : Évitez context-path, utilisez API Gateway pour router
+- **Multi-tenancy** : Context-path par tenant possible mais pas recommandé (préférez sous-domaines)
+
+**Dans ce module** : Nous utilisons `/catalogue` pour distinguer visuellement les microservices pendant l'apprentissage. En production réelle, vous utiliseriez plutôt un API Gateway (Module 9).
+
 ### 2.5. Dependency Injection et IoC
 
 **Inversion of Control (IoC)** : Le framework gère le cycle de vie des objets, pas le développeur.
@@ -762,6 +843,152 @@ public class PrototypeService { }
 ---
 
 ## 3. JPA & Hibernate - Concepts Avancés
+
+### 3.0. Choix de la Base de Données : H2 vs PostgreSQL
+
+#### Pourquoi H2 pour ce Module ?
+
+**H2** est une base de données **en mémoire** écrite en Java, parfaite pour le développement et l'apprentissage.
+
+**Avantages en développement** :
+
+| Critère | H2 | Impact |
+|---------|----|----|
+| **Installation** | ✅ Aucune | Ajoutez la dépendance Maven, c'est tout |
+| **Configuration** | ✅ Minimale | 3 lignes dans `application.yml` |
+| **Démarrage** | ✅ Instantané | Base créée automatiquement en RAM |
+| **Tests** | ✅ Parfait | Isolation complète, rapide |
+| **Portabilité** | ✅ Maximale | Fonctionne partout (Windows, Mac, Linux) |
+| **Apprentissage** | ✅ Focus JPA | Pas de distraction avec la base |
+
+**Limitations** :
+
+| Problème | Conséquence |
+|----------|-------------|
+| ❌ **Données volatiles** | Tout est perdu au redémarrage |
+| ❌ **RAM uniquement** | Pas de persistance disque (mode par défaut) |
+| ❌ **Pas pour production** | Utilisable uniquement en dev/test |
+| ❌ **Dialecte SQL limité** | Quelques différences vs PostgreSQL |
+
+**Configuration H2** (`application.yml`) :
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:h2:mem:catalogue_db      # Base en mémoire
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true                     # Console web H2
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop             # Recrée le schéma au démarrage
+    show-sql: true                      # Affiche les requêtes SQL
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+```
+
+**Modes H2** :
+
+1. **En mémoire** (ce module) : `jdbc:h2:mem:dbname`
+   - Données perdues au redémarrage
+   - Ultra-rapide
+
+2. **Fichier** : `jdbc:h2:file:./data/dbname`
+   - Données persistées sur disque
+   - Utile pour développement local
+
+3. **Serveur** : `jdbc:h2:tcp://localhost/~/dbname`
+   - Plusieurs applications peuvent se connecter
+   - Rarement utilisé
+
+#### Migration vers PostgreSQL (Module 4)
+
+**PostgreSQL** est la base de données **production** que nous utiliserons à partir du Module 4.
+
+**Pourquoi PostgreSQL ?**
+
+| Avantage | Description |
+|----------|-------------|
+| ✅ **Données persistantes** | Survit aux redémarrages |
+| ✅ **Production-ready** | Utilisé par millions d'applications |
+| ✅ **ACID complet** | Garanties transactionnelles solides |
+| ✅ **Fonctionnalités avancées** | JSON, Full-text search, GIS, etc. |
+| ✅ **Performance** | Optimisations pour grandes volumétries |
+| ✅ **Outils** | pgAdmin, DBeaver, extensions riches |
+
+**Migration H2 → PostgreSQL** :
+
+Au Module 4, nous changerons simplement la configuration :
+
+```yaml
+# application-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/catalogue_db
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: your_password
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # ⚠️ Ne plus utiliser create-drop !
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+```
+
+**Gestion du schéma en production** :
+
+| Outil | Usage |
+|-------|-------|
+| **Liquibase** (Module 4) | Migrations versionnées (recommandé) |
+| **Flyway** | Alternative à Liquibase |
+| `ddl-auto: validate` | Vérifie que le schéma correspond aux entités |
+
+**Différences SQL H2 vs PostgreSQL** :
+
+```sql
+-- H2 : AUTO_INCREMENT
+CREATE TABLE products (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY
+);
+
+-- PostgreSQL : SERIAL ou IDENTITY
+CREATE TABLE products (
+  id BIGSERIAL PRIMARY KEY
+);
+```
+
+**💡 Bonne pratique** : JPA/Hibernate abstrait ces différences. Si vous utilisez uniquement `@GeneratedValue(strategy = GenerationType.IDENTITY)`, votre code fonctionnera sur H2 **et** PostgreSQL sans changement.
+
+#### Stratégie de Développement
+
+**Phase 1 (Modules 2-3)** : H2
+- Focus sur JPA, REST, tests
+- Pas de friction infrastructure
+- Cycle de développement rapide
+
+**Phase 2 (Module 4)** : PostgreSQL + Docker
+- Environnement proche production
+- Migrations avec Liquibase
+- Performance réelle
+
+**Phase 3 (Modules 10+)** : Multi-environnements
+- Profils Spring (`dev`, `test`, `prod`)
+- H2 pour tests automatisés
+- PostgreSQL pour dev local et production
+
+> **Principe** : Commencez simple (H2), évoluez vers robuste (PostgreSQL) au bon moment.
+
+---
 
 ### 3.1. Entity Lifecycle
 
@@ -1061,30 +1288,123 @@ public class JpaConfig {
 }
 ```
 
-**Entité** :
+**Hiérarchie d'entités avec génériques** :
+
+**BaseEntity** (ID + Persistable) :
 
 ```java
+package ma.ensaf.ecommerce.common.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.springframework.data.domain.Persistable;
+
 @MappedSuperclass
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+@EqualsAndHashCode(of = "id")
+public abstract class BaseEntity<ID> implements Persistable<ID> {
+
+    @Id
+    @GeneratedValue
+    private ID id;
+
+    @Override
+    public boolean isNew() {
+        return getId() == null;
+    }
+}
+```
+
+**Points clés de BaseEntity** :
+
+- **`<ID>` générique** : Permet de varier le type d'ID (`Long`, `UUID`, etc.)
+- **`implements Persistable<ID>`** : Optimise la détection des nouvelles entités par Spring Data
+- **`isNew()`** : Spring utilise cette méthode pour décider entre `INSERT` ou `UPDATE`
+- **`@EqualsAndHashCode(of = "id")`** : Comparaison basée sur l'ID par défaut
+
+**AuditedEntity** (Audit automatique + génériques) :
+
+```java
+package ma.ensaf.ecommerce.common.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.springframework.data.annotation.*;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import java.time.LocalDateTime;
+
+@MappedSuperclass
+@Getter @Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
 @EntityListeners(AuditingEntityListener.class)
-public abstract class AuditedEntity extends BaseEntity {
+public abstract class AuditedEntity<ID> extends BaseEntity<ID> {
 
     @CreatedDate
-    @Column(name = "created_at", updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @CreatedBy
-    @Column(name = "created_by", updatable = false)
+    @Column(updatable = false)
     private String createdBy;
 
     @LastModifiedBy
-    @Column(name = "updated_by")
     private String updatedBy;
 }
 ```
+
+**Points clés de AuditedEntity** :
+
+- **`<ID>` générique propagé** : `extends BaseEntity<ID>`
+- **`@EntityListeners(AuditingEntityListener.class)`** : Active l'auditing automatique Spring Data
+- **`@CreatedDate`, `@LastModifiedDate`** : Spring remplit automatiquement ces champs
+- **`@CreatedBy`, `@LastModifiedBy`** : Remplis via `AuditorAware` (utilisateur connecté)
+- **`@Getter @Setter @ToString`** : Bonne pratique avec héritage (évite conflits equals/hashCode)
+
+**Utilisation** :
+
+```java
+@Entity
+@Table(name = "products")
+@Getter @Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+public class Product extends AuditedEntity<Long> {
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, unique = true)
+    private String sku;
+
+    @Column(nullable = false)
+    private Double price;
+
+    private Integer stockQuantity;
+    private String category;
+    private boolean available = true;
+}
+```
+
+**Avantages de cette hiérarchie** :
+
+- ✅ **Génériques** : Flexibilité du type d'ID (Long, UUID, etc.)
+- ✅ **Persistable** : Optimisation de `save()` (INSERT vs UPDATE)
+- ✅ **Audit automatique** : Pas besoin de `@PrePersist`/`@PreUpdate`
+- ✅ **Traçabilité** : Sait qui a créé/modifié et quand
+- ✅ **Réutilisable** : Toutes les entités héritent de l'auditing
 
 ### 3.7. Query Methods avancés
 

@@ -144,17 +144,7 @@ Server: 204 No Content
 - ✅ **Serveur embarqué** : Tomcat/Jetty inclus, pas besoin de WAR
 - ✅ **Production-ready** : Métriques, health checks inclus
 
-**Avant Spring Boot** (Spring MVC classique) :
-
-```xml
-<!-- 50+ lignes de configuration XML -->
-<bean id="dataSource" class="...">
-    <property name="driverClassName" value="..." />
-    <!-- ... -->
-</bean>
-```
-
-**Avec Spring Boot** :
+**Configuration simplifiée** :
 
 ```yaml
 # application.yml
@@ -162,6 +152,8 @@ spring:
   datasource:
     url: jdbc:h2:mem:testdb
 ```
+
+Spring Boot remplace des dizaines de lignes de configuration XML par quelques lignes YAML simples.
 
 ### Structure d'un Projet Spring Boot
 
@@ -284,7 +276,7 @@ public class Product {
 
 Créer une hiérarchie d'entités dans le module `common` :
 
-**Étape 1 : BaseEntity** (juste l'ID)
+**Étape 1 : BaseEntity** (juste l'ID + génériques)
 
 ```java
 package ma.ensaf.ecommerce.common.model;
@@ -292,6 +284,7 @@ package ma.ensaf.ecommerce.common.model;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.springframework.data.domain.Persistable;
 
 @MappedSuperclass
 @Data
@@ -299,15 +292,27 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(of = "id")
-public abstract class BaseEntity {
+public abstract class BaseEntity<ID> implements Persistable<ID> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue
+    private ID id;
+
+    @Override
+    public boolean isNew() {
+        return getId() == null;
+    }
 }
 ```
 
-**Étape 2 : AuditedEntity** (ajoute l'audit)
+**Explication** :
+
+- **`<ID>` (générique)** : Permet de varier le type d'ID (`Long`, `UUID`, etc.). Applique les **génériques** vus au Module 1.
+- **`implements Persistable<ID>`** : Interface Spring Data qui optimise la détection des nouvelles entités.
+- **`isNew()`** : Retourne `true` si l'entité n'a pas encore d'ID (avant `save()`). Spring utilise cette méthode pour décider entre `INSERT` (nouvelle entité) ou `UPDATE` (entité existante).
+- **`@GeneratedValue`** sans stratégie : Laisse JPA choisir la stratégie par défaut (AUTO).
+
+**Étape 2 : AuditedEntity** (ajoute l'audit + générique)
 
 ```java
 package ma.ensaf.ecommerce.common.model;
@@ -318,17 +323,16 @@ import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
 
 @MappedSuperclass
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter @Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public abstract class AuditedEntity extends BaseEntity {
+public abstract class AuditedEntity<ID> extends BaseEntity<ID> {
 
-    @Column(name = "created_at", updatable = false)
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
@@ -344,6 +348,12 @@ public abstract class AuditedEntity extends BaseEntity {
 }
 ```
 
+**Points clés** :
+
+- **`<ID>` (générique propagé)** : `extends BaseEntity<ID>` transmet le type d'ID à la sous-classe
+- **`@Getter @Setter @ToString`** : Bonne pratique avec héritage (évite les conflits avec equals/hashCode de BaseEntity)
+- **Pas de `@EqualsAndHashCode`** : Délègue la responsabilité à BaseEntity
+
 **Étape 3 : Product** (hérite de AuditedEntity)
 
 ```java
@@ -356,12 +366,12 @@ import ma.ensaf.ecommerce.common.model.AuditedEntity;
 
 @Entity
 @Table(name = "products")
-@Data
-@EqualsAndHashCode(callSuper = false, of = "sku")  // ← Business key !
+@Getter @Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class Product extends AuditedEntity {
+public class Product extends AuditedEntity<Long> {
 
     @Column(nullable = false)
     private String name;
@@ -370,12 +380,11 @@ public class Product extends AuditedEntity {
     private String description;
 
     @Column(nullable = false, unique = true)
-    private String sku;  // Business key : stable, unique, défini dès la création
+    private String sku;
 
     @Column(nullable = false)
     private Double price;
 
-    @Column(name = "stock_quantity")
     private Integer stockQuantity;
 
     private String category;
@@ -384,14 +393,20 @@ public class Product extends AuditedEntity {
 }
 ```
 
+**Points importants** :
+
+- **`extends AuditedEntity<Long>`** : Spécifie que l'ID sera de type `Long`
+- **`@Getter @Setter @ToString`** : Même pattern que AuditedEntity (bonne pratique avec héritage)
+- **equals/hashCode hérités** : Utilise `@EqualsAndHashCode(of = "id")` de BaseEntity par défaut
+
 **Hiérarchie finale** :
 
 ```
-BaseEntity (id)
+BaseEntity<ID> (id, isNew())
     ↓ extends
-AuditedEntity (id, createdAt, updatedAt)
+AuditedEntity<ID> (id, createdAt, updatedAt, isNew())
     ↓ extends
-Product (id, createdAt, updatedAt, name, sku, price, ...)
+Product extends AuditedEntity<Long> (id: Long, createdAt, updatedAt, name, sku, price, ...)
 ```
 
 **Avantages de cette approche** :
@@ -399,6 +414,8 @@ Product (id, createdAt, updatedAt, name, sku, price, ...)
 - ✅ **Flexibilité** : Certaines entités peuvent hériter de BaseEntity (pas besoin d'audit), d'autres de AuditedEntity
 - ✅ **Réutilisable** : Order, User, Payment peuvent tous hériter de AuditedEntity
 - ✅ **Maintenable** : Logique d'audit centralisée
+- ✅ **Génériques** : Type d'ID flexible (`Long`, `UUID`, etc.)
+- ✅ **Persistable** : Optimisation de la détection INSERT vs UPDATE
 - ✅ `@SuperBuilder` : Pattern builder fonctionne avec toute la hiérarchie
 
 ---
@@ -460,20 +477,18 @@ package ma.ensaf.ecommerce.catalogue.repository;
 
 import ma.ensaf.ecommerce.catalogue.model.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // Méthodes fournies automatiquement par JpaRepository :
-    // - save(Product)
-    // - findById(Long)
-    // - findAll()
-    // - deleteById(Long)
-    // - count()
-    // - existsById(Long)
+    // - save(Product) : INSERT ou UPDATE
+    // - findById(Long) : SELECT par ID
+    // - findAll() : SELECT *
+    // - deleteById(Long) : DELETE par ID
+    // - count() : COUNT(*)
+    // - existsById(Long) : EXISTS
 
     // Méthodes personnalisées (Spring génère l'implémentation !)
     Optional<Product> findBySku(String sku);
@@ -490,15 +505,102 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 }
 ```
 
-**Query Methods** : Spring Data génère les requêtes à partir du nom de la méthode !
+**Comment ça fonctionne ?**
 
-| Nom de méthode | Requête générée |
-|----------------|-----------------|
-| `findByName(String name)` | `WHERE name = ?` |
-| `findByPriceLessThan(Double price)` | `WHERE price < ?` |
-| `findByNameAndCategory(...)` | `WHERE name = ? AND category = ?` |
-| `findByNameOrCategory(...)` | `WHERE name = ? OR category = ?` |
-| `findByOrderByPriceAsc()` | `ORDER BY price ASC` |
+1. **Interface seulement** : Vous déclarez uniquement l'interface, Spring génère l'implémentation au démarrage
+2. **`JpaRepository<Product, Long>`** :
+   - `Product` = Type de l'entité
+   - `Long` = Type de l'ID
+3. **`@Repository` optionnel** : Spring détecte automatiquement les interfaces qui étendent `JpaRepository`
+
+### Query Methods : La Magie de Spring Data JPA
+
+**Spring Data génère automatiquement les requêtes SQL à partir du nom de la méthode !**
+
+**Convention de nommage** :
+
+```
+[Action][Subject]By[Property][Condition]
+```
+
+**Exemples** :
+
+| Nom de méthode | Requête SQL générée | Explication |
+|----------------|---------------------|-------------|
+| `findBySku(String sku)` | `SELECT * FROM products WHERE sku = ?` | Recherche par SKU exact |
+| `findByName(String name)` | `SELECT * FROM products WHERE name = ?` | Recherche par nom exact |
+| `findByPriceLessThan(Double price)` | `SELECT * FROM products WHERE price < ?` | Prix inférieur à |
+| `findByPriceGreaterThan(Double price)` | `SELECT * FROM products WHERE price > ?` | Prix supérieur à |
+| `findByPriceBetween(Double min, Double max)` | `SELECT * FROM products WHERE price BETWEEN ? AND ?` | Prix dans intervalle |
+| `findByNameContaining(String keyword)` | `SELECT * FROM products WHERE name LIKE %?%` | Nom contient mot-clé |
+| `findByNameContainingIgnoreCase(String keyword)` | `SELECT * FROM products WHERE UPPER(name) LIKE UPPER(%?%)` | Insensible à la casse |
+| `findByAvailableTrue()` | `SELECT * FROM products WHERE available = true` | Produits disponibles |
+| `findByAvailableFalse()` | `SELECT * FROM products WHERE available = false` | Produits indisponibles |
+| `findByNameAndCategory(String name, String cat)` | `SELECT * FROM products WHERE name = ? AND category = ?` | Deux conditions (AND) |
+| `findByNameOrCategory(String name, String cat)` | `SELECT * FROM products WHERE name = ? OR category = ?` | Deux conditions (OR) |
+| `findByOrderByPriceAsc()` | `SELECT * FROM products ORDER BY price ASC` | Tri ascendant |
+| `findByCategoryOrderByPriceDesc(String cat)` | `SELECT * FROM products WHERE category = ? ORDER BY price DESC` | Filtre + tri |
+| `existsBySku(String sku)` | `SELECT COUNT(*) > 0 FROM products WHERE sku = ?` | Vérifier existence |
+| `countByCategory(String category)` | `SELECT COUNT(*) FROM products WHERE category = ?` | Compter par catégorie |
+| `deleteByCategory(String category)` | `DELETE FROM products WHERE category = ?` | Supprimer par catégorie |
+
+**Mots-clés supportés** :
+
+| Mot-clé | SQL équivalent | Exemple |
+|---------|----------------|---------|
+| `And` | `AND` | `findByNameAndCategory` |
+| `Or` | `OR` | `findByNameOrSku` |
+| `Is`, `Equals` | `=` | `findByName`, `findByNameEquals` |
+| `Between` | `BETWEEN ... AND ...` | `findByPriceBetween` |
+| `LessThan` | `<` | `findByPriceLessThan` |
+| `LessThanEqual` | `<=` | `findByPriceLessThanEqual` |
+| `GreaterThan` | `>` | `findByPriceGreaterThan` |
+| `GreaterThanEqual` | `>=` | `findByPriceGreaterThanEqual` |
+| `Before` | `<` (dates) | `findByCreatedAtBefore` |
+| `After` | `>` (dates) | `findByCreatedAtAfter` |
+| `IsNull` | `IS NULL` | `findByDescriptionIsNull` |
+| `IsNotNull`, `NotNull` | `IS NOT NULL` | `findByDescriptionIsNotNull` |
+| `Like` | `LIKE` | `findByNameLike` |
+| `NotLike` | `NOT LIKE` | `findByNameNotLike` |
+| `StartingWith` | `LIKE ?%` | `findByNameStartingWith` |
+| `EndingWith` | `LIKE %?` | `findByNameEndingWith` |
+| `Containing` | `LIKE %?%` | `findByNameContaining` |
+| `OrderBy` | `ORDER BY` | `findByOrderByPriceAsc` |
+| `Not` | `!=` | `findByNameNot` |
+| `In` | `IN (...)` | `findByCategoryIn(List<String>)` |
+| `NotIn` | `NOT IN (...)` | `findByCategoryNotIn(List<String>)` |
+| `True` | `= true` | `findByAvailableTrue` |
+| `False` | `= false` | `findByAvailableFalse` |
+| `IgnoreCase` | `UPPER(...)` | `findByNameIgnoreCase` |
+
+**Types de retour supportés** :
+
+```java
+// Une seule entité (ou null)
+Product findBySku(String sku);
+
+// Une seule entité (ou Optional.empty())
+Optional<Product> findBySku(String sku);
+
+// Liste d'entités
+List<Product> findByCategory(String category);
+
+// Booléen (existence)
+boolean existsBySku(String sku);
+
+// Nombre (comptage)
+long countByCategory(String category);
+
+// Suppression (retourne nombre de suppressions)
+long deleteByCategory(String category);
+```
+
+**💡 Pourquoi cette approche est puissante ?**
+
+1. **Pas de SQL manuel** : Moins d'erreurs, code plus lisible
+2. **Type-safe** : Le compilateur vérifie les noms de propriétés
+3. **Maintenance facile** : Si vous renommez un champ dans l'entité, l'IDE détectera les erreurs
+4. **Génération au démarrage** : Spring analyse le nom de méthode et génère le code au lancement
 
 ### Configuration H2 et Application
 
@@ -511,7 +613,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 server:
   port: 8081                              # Port du service (8080 par défaut)
   servlet:
-    context-path: /catalogue              # Préfixe optionnel (ex: /catalogue/api/products)
+    context-path: /catalogue              # ⚠️ OPTIONNEL - voir ci-dessous
 
 # Configuration de la base de données
 spring:
@@ -540,12 +642,26 @@ spring:
 
 **Paramètres importants** :
 
-| Paramètre | Description | Exemple |
-|-----------|-------------|---------|
+| Paramètre | Description | Valeur |
+|-----------|-------------|--------|
 | `server.port` | Port d'écoute | `8081` (défaut: 8080) |
-| `server.servlet.context-path` | Préfixe URL (optionnel) | `/catalogue` → URLs deviennent `/catalogue/api/products` |
 | `spring.application.name` | Nom du service | `catalogue-service` |
 | `spring.jpa.hibernate.ddl-auto` | Gestion du schéma | `create-drop` (dev), `validate` (prod) |
+
+**⚠️ Context-path : OPTIONNEL**
+
+```yaml
+server:
+  servlet:
+    context-path: /catalogue  # Préfixe optionnel
+```
+
+| Si présent (`/catalogue`) | Si absent (commenté ou supprimé) |
+|---------------------------|----------------------------------|
+| ✅ URLs : `http://localhost:8081/catalogue/api/v1/products` | ✅ URLs : `http://localhost:8081/api/v1/products` |
+| ✅ Console H2 : `http://localhost:8081/catalogue/h2-console` | ✅ Console H2 : `http://localhost:8081/h2-console` |
+
+> 💡 **Dans ce module** : Nous utilisons `/catalogue` pour distinguer les services. Vous pouvez le retirer si vous préférez des URLs plus courtes.
 
 > 💡 **Microservices** : Comme nous développons plusieurs services en parallèle, chaque service **doit avoir un port différent** :
 >
@@ -558,6 +674,32 @@ spring:
 - JDBC URL: `jdbc:h2:mem:catalogue_db`
 - Username: `sa`
 - Password: (vide)
+
+### 💡 H2 vs PostgreSQL : Quand utiliser quoi ?
+
+**Pour ce module (Module 2)** : Nous utilisons **H2**
+
+| Avantage | Raison |
+|----------|--------|
+| ✅ **Zéro configuration** | Aucune installation requise |
+| ✅ **Démarrage instantané** | Base créée automatiquement en mémoire |
+| ✅ **Parfait pour apprendre** | Focus sur JPA, pas sur la base de données |
+| ✅ **Tests rapides** | Idéal pour TDD (cycle RED-GREEN-REFACTOR) |
+
+| Limitation | Impact |
+|------------|--------|
+| ❌ **Données perdues au redémarrage** | Tout est en RAM |
+| ❌ **Pas pour production** | Seulement dev/test |
+
+**Module 4** : Migration vers **PostgreSQL**
+
+| Avantage | Usage |
+|----------|-------|
+| ✅ **Données persistantes** | Survit aux redémarrages |
+| ✅ **Production-ready** | Base de données professionnelle |
+| ✅ **Migrations avec Liquibase** | Gestion du schéma versionnée |
+
+> **Principe** : Commencez simple (H2), passez à robuste (PostgreSQL) quand nécessaire.
 
 ---
 
@@ -975,38 +1117,70 @@ curl -X DELETE http://localhost:8081/api/v1/products/1
 
 ### Dépendances Maven Essentielles
 
+**Version utilisée** : Spring Boot 4.0.0 (Java 21 minimum)
+
 ```xml
+<parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.0</version>
+    <relativePath/>
+</parent>
+
+<properties>
+    <java.version>21</java.version>
+</properties>
+
 <dependencies>
-    <!-- Spring Boot Starter Web -->
+    <!-- Spring Boot Starter Web MVC : API REST -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
+        <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
 
-    <!-- Spring Boot Starter Data JPA -->
+    <!-- Spring Boot Starter Data JPA : Persistance -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
 
-    <!-- H2 Database -->
+    <!-- H2 Database : Base de données en mémoire -->
     <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
         <scope>runtime</scope>
     </dependency>
 
-    <!-- Lombok -->
+    <!-- H2 Console : Interface web pour H2 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-h2console</artifactId>
+    </dependency>
+
+    <!-- Actuator : Monitoring et métriques -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- Lombok : Réduction du code boilerplate -->
     <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <scope>provided</scope>
+        <optional>true</optional>
     </dependency>
 
-    <!-- Tests -->
+    <!-- Tests JPA -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-test</artifactId>
+        <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- Tests Web MVC -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webmvc-test</artifactId>
         <scope>test</scope>
     </dependency>
 </dependencies>

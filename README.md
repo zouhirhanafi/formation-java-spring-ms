@@ -55,7 +55,7 @@ La formation propose **deux niveaux de documentation** :
 
 ---
 
-## Module 2 : Premier Microservice - Service Catalogue (8h)
+## Module 2 : Premier Microservice - Service Catalogue (6h)
 
 ### Théorie (2h)
 
@@ -63,15 +63,17 @@ La formation propose **deux niveaux de documentation** :
 - JPA et H2 pour démarrer rapidement
 - Endpoints REST
 
-### Projet (6h)
+### Projet (4h)
 
-**Exercice pratique** : Développer le service Catalogue
+**Exercice pratique** : Développer le service Catalogue (Product)
 
 - Modèle `Product` avec JPA
 - Repository et Service layer
 - CRUD REST endpoints
 - Tests avec base H2 en mémoire
 - **Livrable** : Service Catalogue fonctionnel avec 5 endpoints REST
+
+> **💡 Bonus** : L'exercice Category (2h supplémentaires) est disponible pour les apprentis souhaitant approfondir
 
 ---
 

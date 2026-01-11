@@ -1,6 +1,6 @@
 # Module 1 : Exercices Pratiques - Fondamentaux Java Moderne
 
-**Durée** : 4h  
+**Durée** : 7h30
 **Mode** : Travail autonome avec validation par tests
 
 ---
@@ -10,21 +10,24 @@
 À la fin de ces exercices, vous aurez :
 
 - Créé la structure du projet Maven multi-modules
-- Configuré Lombok et les dépendances de test  
+- Configuré Lombok et les dépendances de test
+- Maîtrisé les génériques avec la classe `Pair<K, V>`
 - Implémenté une classe `ProductFilter` avec Streams API
+- Créé un pattern Repository générique (bonus)
 - Écrit des tests unitaires avec JUnit 6 et AssertJ
 
 ---
 
 ## 📚 Ressources
 
-- **Cours théorique** : `docs/module1/cours.md`
+- **Cours théorique** : `docs/module1/cours-essentiel.md` (guide rapide) ou `cours-complet.md` (approfondi)
 - **Correction** : `docs/module1/correction.md` ⚠️ À consulter APRÈS vos tentatives
+- **Troubleshooting** : `docs/module1/TROUBLESHOOTING.md` 🆘 Guide de dépannage des erreurs courantes
 - **Documentation** : `docs/stack-technique.md` et `docs/conception.md`
 
 ---
 
-## 📦 Exercice 1 : Setup du Projet Maven (45 min)
+## 📦 Exercice 1 : Setup du Projet Maven (1h)
 
 ### Objectif
 
@@ -176,7 +179,7 @@ mvn clean compile
 
 ---
 
-## 🏗️ Exercice 2 : Classe Product avec Lombok (30 min)
+## 🏗️ Exercice 2 : Classe Product avec Lombok (1h)
 
 ### Objectif
 
@@ -258,21 +261,114 @@ mvn test -Dtest=ProductTest
 
 ---
 
-## 🔍 Exercice 3 : ProductFilter avec Streams API (2h)
+## 🎓 Exercice 3 : Classe générique Pair (1h)
+
+### Objectif
+
+Créer une classe générique `Pair<K, V>` pour stocker deux valeurs.
+
+### Instructions
+
+Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/Pair.java`.
+
+**Attributs** :
+
+- `K key`
+- `V value`
+
+**Constructeurs** :
+
+- Constructeur avec paramètres
+- Constructeur sans paramètres
+
+**Annotations Lombok** :
+
+- `@Data`
+- `@AllArgsConstructor`
+- `@NoArgsConstructor`
+
+**Méthodes à implémenter** :
+
+```java
+// Factory method
+public static <K, V> Pair<K, V> of(K key, V value)
+
+// Transforme la key
+public <R> Pair<R, V> mapKey(Function<K, R> mapper)
+
+// Transforme la value
+public <R> Pair<K, R> mapValue(Function<V, R> mapper)
+
+// Transforme les deux
+public <R1, R2> Pair<R1, R2> map(Function<K, R1> keyMapper, Function<V, R2> valueMapper)
+```
+
+### Tests à écrire
+
+Créez `PairTest.java` avec :
+
+1. Test création avec `of("Age", 25)`
+2. Test `mapKey()` - transformer key en majuscules
+3. Test `mapValue()` - transformer value en String
+4. Test `map()` - transformer les deux
+5. Test avec types différents (String, Product)
+
+### Validation
+
+```bash
+cd common
+mvn test -Dtest=PairTest
+```
+
+✅ **Attendu** : `Tests run: 5, Failures: 0`
+
+---
+
+## 🔍 Exercice 4 : ProductFilter avec Streams API (2h30)
 
 ### Objectif
 
 Créer une classe utilitaire pour filtrer des produits avec la Streams API.
 
 Cet exercice est **découpé en 2 parties** pour une progression graduelle :
-- **Partie A (1h15)** : Méthodes de base (filter, map, sorted, min, max)
-- **Partie B (45min)** : Méthodes avancées (groupBy, reduce, collectors complexes)
+- **Partie A (1h30)** : Méthodes de base (filter, map, sorted, min, max)
+- **Partie B (1h)** : Méthodes avancées (groupBy, reduce, collectors complexes)
 
 ---
 
-### 🎯 Partie A : Méthodes de Base (1h15)
+### 🎯 Partie A : Méthodes de Base (1h30)
 
 Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/ProductFilter.java`.
+
+#### 💡 Rappel : Pourquoi les Streams ?
+
+**❌ Avant (Java 7)** :
+```java
+public List<Product> filterByCategory(List<Product> products, String category) {
+    List<Product> result = new ArrayList<>();
+    for (Product p : products) {
+        if (category.equals(p.getCategory())) {
+            result.add(p);
+        }
+    }
+    return result;
+}
+```
+
+**✅ Maintenant (Java 8+)** :
+```java
+public List<Product> filterByCategory(List<Product> products, String category) {
+    return products.stream()
+        .filter(p -> category.equals(p.getCategory()))
+        .collect(Collectors.toList());
+}
+```
+
+**Pourquoi c'est mieux ?**
+- Code plus lisible et déclaratif (on dit "quoi" faire, pas "comment")
+- Moins de code boilerplate (pas de liste temporaire, pas de boucle)
+- Parallélisable facilement (`.parallelStream()`)
+- Moins d'erreurs (pas d'oubli d'initialisation, pas d'index)
 
 #### Méthodes à implémenter - Partie A
 
@@ -355,9 +451,40 @@ mvn test -Dtest=ProductFilterTest
 
 ---
 
-### 🚀 Partie B : Méthodes Avancées (45min)
+### 🚀 Partie B : Méthodes Avancées (1h)
 
 **Prérequis** : Avoir terminé la Partie A avec succès
+
+#### 💡 Exemple : Grouper et Compter
+
+**❌ Avant (Java 7)** :
+```java
+public Map<String, Long> countByCategory(List<Product> products) {
+    Map<String, Long> counts = new HashMap<>();
+    for (Product p : products) {
+        String category = p.getCategory();
+        if (counts.containsKey(category)) {
+            counts.put(category, counts.get(category) + 1);
+        } else {
+            counts.put(category, 1L);
+        }
+    }
+    return counts;
+}
+```
+
+**✅ Maintenant (Java 8+)** :
+```java
+public Map<String, Long> countByCategory(List<Product> products) {
+    return products.stream()
+        .collect(Collectors.groupingBy(
+            Product::getCategory,
+            Collectors.counting()
+        ));
+}
+```
+
+**Gain** : 10 lignes → 3 lignes, intention claire, moins de bugs potentiels
 
 #### Méthodes à implémenter - Partie B
 
@@ -414,120 +541,168 @@ mvn test -Dtest=ProductFilterTest
 
 ---
 
-## 🎓 Exercice 4 : Classe générique Pair (45 min)
-
-### Objectif
-
-Créer une classe générique `Pair<K, V>` pour stocker deux valeurs.
-
-### Instructions
-
-Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/Pair.java`.
-
-**Attributs** :
-
-- `K key`
-- `V value`
-
-**Constructeurs** :
-
-- Constructeur avec paramètres
-- Constructeur sans paramètres
-
-**Annotations Lombok** :
-
-- `@Data`
-- `@AllArgsConstructor`
-- `@NoArgsConstructor`
-
-**Méthodes à implémenter** :
-
-```java
-// Factory method
-public static <K, V> Pair<K, V> of(K key, V value)
-
-// Transforme la key
-public <R> Pair<R, V> mapKey(Function<K, R> mapper)
-
-// Transforme la value
-public <R> Pair<K, R> mapValue(Function<V, R> mapper)
-
-// Transforme les deux
-public <R1, R2> Pair<R1, R2> map(Function<K, R1> keyMapper, Function<V, R2> valueMapper)
-```
-
-### Tests à écrire
-
-Créez `PairTest.java` avec :
-
-1. Test création avec `of("Age", 25)`
-2. Test `mapKey()` - transformer key en majuscules
-3. Test `mapValue()` - transformer value en String
-4. Test `map()` - transformer les deux
-5. Test avec types différents (String, Product)
-
-### Validation
-
-```bash
-cd common
-mvn test -Dtest=PairTest
-```
-
-✅ **Attendu** : `Tests run: 5, Failures: 0`
-
----
-
-## 🚀 Exercice 5 : Repository générique (BONUS - 30 min)
+## 🚀 Exercice 5 : Repository générique (BONUS - 1h15)
 
 ### Objectif
 
 Créer une interface générique `Repository<T, ID>` et son implémentation en mémoire.
 
-### Instructions
+Cet exercice est **découpé en 2 parties** :
+- **Partie A (30min)** : Interface Repository
+- **Partie B (45min)** : Implémentation en mémoire + tests
 
-#### Interface Repository
+---
 
-Créez `Repository.java` avec les méthodes :
+### 🎯 Partie A : Interface Repository (30min)
 
-- `T save(T entity)`
-- `Optional<T> findById(ID id)`
-- `List<T> findAll()`
-- `void deleteById(ID id)`
-- `boolean existsById(ID id)`
-- `long count()`
-- `List<T> findBy(Predicate<T> predicate)`
+#### Instructions
 
-#### Implémentation InMemoryProductRepository
+Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/Repository.java`.
 
-Créez `InMemoryProductRepository.java` qui implémente `Repository<Product, Long>`.
+**Signature générique** :
 
-Utilisez une `Map<Long, Product>` interne et un générateur d'ID (`AtomicLong`).
+```java
+public interface Repository<T, ID> {
+    // Méthodes à déclarer
+}
+```
 
-Ajoutez des méthodes spécifiques :
+**Méthodes à déclarer** :
 
-- `List<Product> findByCategory(String category)`
-- `List<Product> findAvailable()`
-- `void clear()` (pour les tests)
+- `T save(T entity)` - Sauvegarde une entité
+- `Optional<T> findById(ID id)` - Trouve une entité par son ID
+- `List<T> findAll()` - Trouve toutes les entités
+- `void deleteById(ID id)` - Supprime une entité par son ID
+- `boolean existsById(ID id)` - Vérifie si une entité existe
+- `long count()` - Compte le nombre d'entités
+- `List<T> findBy(Predicate<T> predicate)` - Trouve les entités correspondant au prédicat
 
-### Tests à écrire
+#### 💡 Conseils Partie A
 
-Au minimum 8 tests :
+- C'est une **interface** → pas d'implémentation, juste les signatures
+- Pensez aux imports : `java.util.Optional`, `java.util.List`, `java.util.function.Predicate`
+- Ajoutez des JavaDoc pour documenter chaque méthode
 
-1. `save()` génère un ID
+#### Mini-Test de Validation
+
+Créez un mini-test temporaire pour vérifier que l'interface compile :
+
+```java
+class RepositoryTest {
+    @Test
+    void interfaceShouldCompile() {
+        Repository<Product, Long> repo = null; // Juste pour compiler
+        assertThat(repo).isNull(); // OK
+    }
+}
+```
+
+⚠️ **CHECKPOINT** : Validez l'interface avant de passer à l'implémentation !
+
+---
+
+### 🚀 Partie B : Implémentation (45min)
+
+**Prérequis** : Avoir créé l'interface Repository avec succès
+
+#### Instructions
+
+Créez `common/src/main/java/ma/ensaf/ecommerce/common/util/InMemoryProductRepository.java`.
+
+**Structure de base** :
+
+```java
+public class InMemoryProductRepository implements Repository<Product, Long> {
+
+    private final Map<Long, Product> storage = new ConcurrentHashMap<>();
+    private final AtomicLong idGenerator = new AtomicLong(1);
+
+    // Implémenter les 7 méthodes de Repository<T, ID>
+}
+```
+
+**Imports nécessaires** :
+
+```java
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+```
+
+**Méthodes à implémenter** :
+
+1. `save(Product)` :
+   - Si product.getId() est null → générer un ID avec `idGenerator.getAndIncrement()`
+   - Stocker dans `storage` avec `.put(id, product)`
+   - Retourner le product
+
+2. `findById(Long id)` :
+   - Utiliser `Optional.ofNullable(storage.get(id))`
+
+3. `findAll()` :
+   - Retourner `new ArrayList<>(storage.values())`
+
+4. `deleteById(Long id)` :
+   - `storage.remove(id)`
+
+5. `existsById(Long id)` :
+   - `storage.containsKey(id)`
+
+6. `count()` :
+   - `storage.size()`
+
+7. `findBy(Predicate<Product>)` :
+   - `storage.values().stream().filter(predicate).collect(Collectors.toList())`
+
+**Méthodes spécifiques à ajouter** :
+
+```java
+// Trouve par catégorie
+public List<Product> findByCategory(String category) {
+    return findBy(p -> category.equals(p.getCategory()));
+}
+
+// Trouve les produits disponibles
+public List<Product> findAvailable() {
+    return findBy(Product::isAvailableForSale);
+}
+
+// Nettoie le repository (utile pour les tests)
+public void clear() {
+    storage.clear();
+    idGenerator.set(1);
+}
+```
+
+#### Tests à écrire - Partie B
+
+Créez `common/src/test/java/ma/ensaf/ecommerce/common/util/InMemoryProductRepositoryTest.java`.
+
+**9 tests minimum** :
+
+1. `save()` génère un ID automatiquement
 2. `findById()` retourne le produit
-3. `findById()` avec ID inexistant → empty
+3. `findById()` avec ID inexistant → Optional.empty()
 4. `findAll()` retourne tous les produits
-5. `deleteById()` supprime
-6. `existsById()` retourne true/false
-7. `count()` retourne le bon nombre
-8. `findBy()` filtre avec prédicat
+5. `deleteById()` supprime le produit
+6. `existsById()` retourne true si le produit existe
+7. `count()` retourne le nombre de produits
+8. `findBy()` avec prédicat filtre correctement
+9. `findByCategory()` filtre par catégorie
 
-### Validation
+#### 💡 Conseils Partie B
+
+- Utilisez `@BeforeEach` pour créer un nouveau repository avant chaque test
+- Testez les cas limites : liste vide, ID inexistant, etc.
+- Vérifiez que l'ID généré commence à 1 et s'incrémente
+
+#### Validation Partie B
 
 ```bash
 cd common
 mvn test -Dtest=InMemoryProductRepositoryTest
 ```
+
+✅ **Attendu** : `Tests run: 9, Failures: 0`
 
 ---
 
@@ -581,10 +756,11 @@ Tests run: 43+, Failures: 0, Errors: 0, Skipped: 0
 
 ### Si vous êtes bloqué
 
-1. **Relisez le cours** (`docs/module1/cours.md`)
-2. **Consultez la JavaDoc** des classes Stream, Optional, Collectors
-3. **Testez dans un main()** pour comprendre
-4. **En dernier recours** : regardez la correction
+1. **Consultez le guide de dépannage** : `docs/module1/TROUBLESHOOTING.md` 🆘
+2. **Relisez le cours** : `docs/module1/cours-essentiel.md`
+3. **Consultez la JavaDoc** des classes Stream, Optional, Collectors
+4. **Testez dans un main()** pour comprendre
+5. **En dernier recours** : regardez la correction
 
 ### Stratégie recommandée
 
